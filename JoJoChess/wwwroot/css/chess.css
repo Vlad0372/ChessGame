@@ -1,0 +1,705 @@
+﻿/*LAYOUT STYLES*/
+.navbar {
+    background-color: #F0C5A2;
+    border-bottom: 1px solid #c79165;
+}
+a.navbar-brand {
+  white-space: normal;
+  text-align: center;
+  word-break: break-all;
+}
+/* Provide sufficient contrast against white background */
+a {
+  color: #0366d6;
+}
+
+.btn-primary {
+  color: #fff;
+  background-color: #1b6ec2;
+  border-color: #1861ac;
+}
+
+.nav-pills .nav-link.active, .nav-pills .show > .nav-link {
+  color: #fff;
+  background-color: #1b6ec2;
+  border-color: #1861ac;
+}
+
+/* Sticky footer styles
+-------------------------------------------------- */
+html {
+  font-size: 14px;
+}
+.border-top {
+  border-top: 2px solid black;
+}
+.border-bottom {
+  border-bottom: 2px solid black;
+}
+.box-shadow {
+  box-shadow: 0 .25rem .75rem rgba(0, 0, 0, 0.15);
+}
+button.accept-policy {
+  font-size: 1rem;
+  line-height: inherit;
+}
+/* Sticky footer styles
+-------------------------------------------------- */
+html {
+  position: relative;
+  /*min-height: 100%;*/
+  height: 100%;
+}
+body {
+    /* Margin bottom by footer height */
+    background-color: #FFE2CA;
+    /*margin-bottom: 60px;*/
+    height: 100%;
+}
+main {
+    overflow-y: auto;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    height: 100%;
+    width: 100%;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.footer {
+    box-shadow: 0 -0.25rem .75rem rgba(0, 0, 0, 0.15);
+    border-top: 1px solid #c79165;
+    background-color: #F0C5A2;
+    /*position: absolute;
+    bottom: 0;*/
+    padding-left: 20px;
+    width: 100%;
+    white-space: nowrap;
+    line-height: 60px; /* Vertically center the text there */
+}
+/*CHESS BOARD STYLES*/
+.mainContainer {
+    max-width: max-content;
+    /*padding-top: 40px;
+        padding-right: 40px;*/
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* max-height: 100%; */
+    /* max-width: max-content; */
+}
+.board {
+    font-weight: 600;
+    position: relative;
+    display: none;
+    flex-wrap: wrap;
+    height: 320px;
+    width: 320px;
+    /*max-width: fit-content;
+        max-height: fit-content;*/
+}
+.board img {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+}
+.centralBoard {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    border: solid 2px black;
+    height: 93%;
+    width: 93%;
+    background-repeat: no-repeat;
+    background-image: url("../content/images/boards/board0.png");
+    background-size: 100%;
+    /*max-width: fit-content;
+            max-height: fit-content;*/
+}
+.boardLine {
+    height: 100%;
+    display: flex;
+    align-items: stretch;
+}
+.boardLine div {
+    position: relative;
+    width: 100%;
+}
+.letters {
+    margin-left: 7%;
+    width: 100%;
+    height: 7%;
+    display: flex;
+    justify-content: space-around;
+}
+
+.numbers {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    align-items: center;
+    width: 7%;
+}
+
+    .letters p, .numbers p {
+        margin: 0;
+    }
+
+.exchangeContainer {
+    z-index: 1;
+    position: absolute;
+    display: none;
+    min-width: fit-content;
+    min-height: fit-content;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    flex-direction: row;
+    background-color: #FECE9E;
+}
+
+.hideVariants {
+    background-color: #D18B46;
+    border: 2px solid black;
+    width: max-content;
+    height: max-content;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    height: 39px;
+}
+
+    .hideVariants:hover {
+        background-color: #888888;
+    }
+
+.arrow {
+    margin: 0;
+    padding: 2px;
+    /*font-size: x-large;
+            align-self: center;*/
+}
+
+    .arrow::selection {
+        background-color: transparent;
+        color: none;
+    }
+
+.exchangeVariants {
+    display: none;
+    justify-content: space-between;
+}
+
+.figureImg {
+    position: relative;
+    border-top: 2px solid black;
+    border-right: 2px solid black;
+    border-bottom: 2px solid black;
+    display: flex;
+    width: 39px;
+    height: 39px;
+}
+
+    .figureImg img {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        cursor: pointer;
+    }
+/*ROOM AND GAMEINFO CONTAINERS*/
+.roomsContainer h5 {
+    text-align: center;
+}
+
+.roomsContainer {
+    display: none;
+    flex-direction: column;
+    height: 250px;
+    width: 320px;
+    margin-bottom: 20px;
+}
+
+.roomManipulate {
+    padding: 2%;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    height: auto;
+    width: 100%;
+    border: 2px solid black;
+    background-color: #FECE9E;
+}
+
+.availableRooms {
+    overflow-x: hidden;
+    overflow-y: auto;
+    height: 100%;
+    width: 100%;
+    border: 2px solid black;
+    background-color: #FECE9E;
+}
+
+.roomUl {
+    width: 100%;
+}
+
+.gameInfo {
+    display: none;
+    flex-direction: column;
+    height: 250px;
+    width: 320px;
+    border: 2px solid black;
+    background-color: #D18B46;
+    margin-bottom: 20px;
+}
+
+.gameActions {
+    height: 20%;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding-top: 2%;
+    padding-bottom: 2%;
+    width: 100%;
+    border-top: 2px solid black;
+}
+
+.gameTimer {
+    font-weight: 600;
+    height: 20%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 2%;
+    padding-bottom: 2%;
+    padding-left: 5%;
+    padding-right: 5%;
+    width: 100%;
+    border-bottom: 2px solid black;
+}
+
+.timer {
+    width: 30%;
+    margin: 0;
+}
+
+.turnInfo {
+    margin: 0;
+}
+
+.notations {
+    background-color: #FECE9E;
+    overflow: auto;
+    padding-left: 2%;
+    padding-right: 2%;
+    width: 100%;
+    height: 100%;
+}
+
+.question {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: cornflowerblue;
+    border: 1px solid blue;
+    color: white;
+    font-weight: 700;
+    border-radius: 15px;
+    cursor: pointer;
+}
+
+.settingsContainer {
+    display: none;
+    z-index: 1;
+    border: 2px solid black;
+    background-color: #FECE9E;
+    justify-content: space-around;
+    align-items: center;
+    border-top: none;
+    padding-bottom: 5px;
+    padding-top: 5px;
+}
+
+    .settingsContainer p {
+        margin: 0;
+    }
+.stylesSelectors {
+    top: 110%;
+    right: 0%;
+    position: absolute;
+    display: none;
+    border: 2px solid black;
+    flex-direction: column;
+    justify-content: space-around;
+    align-items: center;
+    width: 260px;
+    background-color: #01A78A;
+    z-index: 2;
+}
+
+.pickStyleDiv {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    padding-left: 5%;
+    padding-right: 5%;
+    padding-bottom: 2%;
+    padding-top: 2%;
+}
+
+    .pickStyleDiv p {
+        margin: 0;
+    }
+select {
+    width: 40%;
+}
+.chessStyles {
+    position: relative;
+    display: none;
+}
+/*BUTTONS STYLES*/
+.createButton {
+    border: 2px solid #00B277;
+    display: none;
+    background-color: aquamarine;
+}
+
+    .createButton:hover {
+        background-color: #00B277;
+    }
+
+.settingsButton {
+    border: 2px solid #888888;
+    display: none;
+}
+
+    .settingsButton:hover {
+        background-color: #888888;
+    }
+
+.deleteButton {
+    border: 2px solid #E45050;
+    display: none;
+    background-color: #FF7878;
+}
+
+.giveUpButton {
+    border: 2px solid #E45050;
+    display: none;
+    background-color: #FF7878;
+}
+
+.drawButton {
+    border: 2px solid #4B6FB2;
+    display: none;
+    background-color: cornflowerblue;
+}
+
+.refreshGameButton {
+    border: 2px solid #4B6FB2;
+    display: none;
+    background-color: cornflowerblue;
+}
+
+    .drawButton:hover, .refreshGameButton:hover {
+        background-color: #4B6FB2;
+    }
+
+.giveUpButton:hover, .deleteButton:hover {
+    background-color: #E45050;
+}
+.acceptStylesButton {
+    margin: 2%;
+    border: 2px solid #888888;
+    background-color: white;
+}
+
+    .acceptStylesButton:hover {
+        background-color: #888888;
+    }
+.stylesButton {
+    display: flex;
+    cursor: pointer;
+    width: min-content;
+    height: min-content;
+}
+
+    .stylesButton img {
+        width: 23px;
+        height: 23px;
+    }
+.roomsContainer input[type=button] {
+    font-size: smaller;
+}
+
+.gameInfo input[type=button] {
+    font-size: smaller;
+}
+/*TOGGLE CLASSES*/
+.show {
+    display: flex;
+}
+.showTurnZone {
+    cursor: pointer;
+    background-image: url("../content/images/others/dot.png");
+    background-size: 100%;
+    /*background-color: chartreuse;
+        opacity: 0.6;*/
+}
+
+.showBeatZone {
+    cursor: pointer;
+    background-color: rgba(250,10,18, 0.6);
+}
+
+.showCastlingZone {
+    cursor: pointer;
+    background-color: rgba(54,124,163, 0.6);
+}
+
+.showIsPicked {
+    background-color: rgba(255,221,0, 0.6);
+}
+
+.changeBorder {
+    border-bottom: none;
+}
+/*SIMPLE ADAPTIVE*/
+@media (min-width: 440px) {
+
+    .board {
+        width: 400px;
+        height: 400px;
+    }
+
+    .mainContainer {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .roomsContainer {
+        font-size: small;
+        margin-left: 0px;
+        width: 310px;
+        height: 250px;
+        margin-bottom: 0px;
+    }
+
+    .roomContainer h5 {
+        font-size: smaller;
+    }
+
+    .gameInfo {
+        margin-left: 0px;
+        width: 310px;
+        height: 250px;
+        margin-bottom: 0px;
+    }
+
+    .roomsContainer input[type=button] {
+        font-size: small;
+    }
+
+    .gameInfo input[type=button] {
+        font-size: small;
+    }
+
+    .stylesSelectors {
+        width: 270px;
+        font-size: small;
+    }
+
+    .hideVariants {
+        height: 48px;
+    }
+
+    .figureImg {
+        width: 48px;
+        height: 48px;
+    }
+}
+@media (min-width: 740px) {
+    html {
+        font-size: 16px;
+    }
+    
+    .board {
+        width: 400px;
+        height: 400px;
+    }
+
+    .mainContainer {
+        flex-direction: row;
+        align-items: flex-start;
+    }
+
+    .roomsContainer {
+        font-size: small;
+        margin-left: 15px;
+        width: 300px;
+        height: 250px;
+        margin-bottom: 0px;
+    }
+    .roomContainer h5 {
+        font-size: small;
+    }
+    .gameInfo {
+        margin-left: 15px;
+        width: 300px;
+        height: 250px;
+        margin-bottom: 0px;
+    }
+
+    .roomsContainer input[type=button] {
+        font-size: small;
+    }
+
+    .gameInfo input[type=button] {
+        font-size: small;
+    }
+
+    .stylesSelectors {
+        width: 270px;
+        font-size: small;
+    }
+
+    .hideVariants {
+        height: 48px;
+    }
+
+    .figureImg {
+        width: 48px;
+        height: 48px;
+    }
+    .stylesButton img {
+        width: 30px;
+        height: 30px;
+    }
+}
+@media (min-width: 850px) {
+    html {
+        font-size: 14px;
+    }
+
+    .board {
+        width: 477px;
+        height: 477px;
+    }
+    .mainContainer {
+        flex-direction: row;
+        align-items: flex-start;
+    }
+
+    .roomsContainer {
+        font-size: medium;
+        margin-left: 20px;
+        width: 320px;
+        height: 300px;
+        margin-bottom: 0px;
+    }
+    .roomContainer h5{
+        font-size: medium;
+    }
+    .gameInfo {
+        font-size: large;
+        margin-left: 20px;
+        width: 320px;
+        height: 300px;
+        margin-bottom: 0px;
+    }
+
+    .roomsContainer input[type=button] {
+        font-size: 14px;
+    }
+
+    .gameInfo input[type=button] {
+        font-size: 14px;
+    }
+
+    .stylesSelectors {
+        width: 300px;
+        font-size: medium;
+        
+    }
+    .settingsContainer {
+        font-size: 14px;
+        
+    }
+    .hideVariants {
+        height: 58px;
+    }
+
+    .figureImg {
+        width: 58px;
+        height: 58px;
+    }
+    .stylesButton img {
+        width: 30px;
+        height: 30px;
+    }
+}
+/*@media (min-width: 1050px) {
+    html {
+        font-size: 16px;
+    }
+    main{
+        align-items: center;
+    }
+    .board{
+        width: 630px;
+        height: 630px;
+    }
+    .mainContainer {
+        flex-direction: row;
+        align-items: flex-start;
+    }
+    .roomsContainer {
+        font-size: large;
+        margin-left: 30px;
+        width: 370px;
+        height: 300px;
+        margin-bottom: 0px;
+    }
+    .gameInfo {
+        font-size: larger;
+        margin-left: 30px;
+        width: 370px;
+        height: 300px;
+        margin-bottom: 0px;
+    }
+    .roomsContainer input[type=button] {
+        font-size: medium;
+    }
+
+    .gameInfo input[type=button] {
+        font-size: medium;
+    }
+    .stylesSelectors{
+        width: 330px;
+        font-size: medium;
+    }
+    .settingsContainer{
+        font-size: medium;
+    }
+    .hideVariants {
+        height: 75px;
+    }
+    .figureImg{
+        width: 75px;
+        height: 75px;
+    }
+    .stylesButton img {
+        width: 30px;
+        height: 30px;
+    }
+}*/
