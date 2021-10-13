@@ -1,5 +1,6 @@
 ﻿"use strict";
 
+//VARIABLES
 var connection = new signalR.HubConnectionBuilder()
     .withUrl("/chesshub")
     .build();
@@ -22,7 +23,8 @@ var imgSrcArr = [
         "content/images/figures/s1/pw.png"
     ]
 ];
-var turnsCount = 0;
+var turnsCounter = 0;
+var piecesCounter = 0;
 
 var turnZones = [];
 
@@ -30,6 +32,15 @@ const TURN_ZONE = "showTurnZone";
 const BEAT_ZONE = "showBeatZone";
 const CASTLING_ZONE = "showCastlingZone";
 const IS_PICKED = "showIsPicked";
+
+const MOVE_TURN = "move";
+const BEAT_TURN = "beat";
+const ENPASSANT_TURN = "enPassant";
+const CASTLING_TURN = "castling";
+
+const ROOK_MOVE_INDEXES = [-10, 1, 10, -1];
+const BISHOP_MOVE_INDEXES = [-11, 9, 11, -9];
+const QUEEN_MOVE_INDEXES = [-10, -9, 1, 11, 10, 9, -1, -11];
 
 var board = [];
 
@@ -40,13 +51,14 @@ var user = {
     "isInTurn": false,
     "roomStatus": null//owner/guest
 };
-var funcArr = [rookTurnZones, knightTurnZones,
-    bishopTurnZones, queenTurnZones,
-    kingTurnZones, bishopTurnZones,
-    knightTurnZones, rookTurnZones, pawnTurnZones];
+var funcArr = [linearTurnZones, knightTurnZones,
+    linearTurnZones, linearTurnZones,
+    kingTurnZones, linearTurnZones,
+    knightTurnZones, linearTurnZones, pawnTurnZones];
 
 var isKingAttacked = 0;
 var isKingPotentiallyAttacked = false;
+var kingUnderAttack = null;
 
 var notations = document.getElementById("notations");
 
@@ -84,7 +96,8 @@ var notationsDiv = document.getElementById("notationsDiv");
 var previousStyleIndex1 = "0", previousStyleIndex2 = "0", previousStyleIndex3 = "0";
 
 var exchangeInfo;
-//start connection
+
+//START CONNECTION
 document.getElementById("createRoomButton").disabled = true;
 document.getElementById("deleteRoomButton").disabled = true;
 connection.start().then(function () {
@@ -110,11 +123,10 @@ function getCookie(name) {
     ));
     return matches ? decodeURIComponent(matches[1]) : undefined;
 }
-//styles block
+
+//STYLES BLOCK
 document.getElementById("stylesButton").addEventListener("click", function (event) {
     document.getElementById("stylesSelectors").classList.toggle("show");
-    //document.getElementById("stylesButton").classList.toggle("changeBorder");
-
     event.preventDefault();
 });
 document.getElementById("acceptStylesButton").addEventListener("click", function (event) {
@@ -122,7 +134,7 @@ document.getElementById("acceptStylesButton").addEventListener("click", function
 
     var e1 = document.getElementById("colorPalette");
     var e2 = document.getElementById("boardStyles");
-    var e3 = document.getElementById("figureStyles");
+    var e3 = document.getElementById("piecesStyles");
 
     if (e1.options[e1.selectedIndex].value != previousStyleIndex1) {
         setColorPalette(e1.options[e1.selectedIndex].value);
@@ -250,18 +262,20 @@ function setFigureStyles(index) {
         ];
     }
 }
-//board managment
+
+//CREATE/CLEAR BOARD
 function createBoard() {
     var k = 0;
     for (var i = 0; i < 8; i++) {        
         for (var j = 0; j < 8; j++) {
             var elem = document.getElementById(k);
-            elem.addEventListener("click", figureAction, false);
+            elem.addEventListener("click", pieceAction, false);
             var square = {
                 "div": elem,
                 "isAttacked": false,
                 "isForDefend": false,
-                "figure": null
+                "underAttack": null,
+                "piece": null
             }
             board.push(square);
             k++;
@@ -272,30 +286,41 @@ function createBoard() {
 }
 function clearBoard() {
     for (var i in board) {
-        if (board[i] != null && board[i].figure != null) {
-            board[i].div.removeChild(board[i].figure.img);
-            //board[i].figure = null;
-            //board[i].isForDefend = false;
-            //board[i].isAttacked = false;
+        if (board[i] != null && board[i].piece != null) {
+            board[i].div.removeChild(board[i].piece.img);
         }
     }
     board = [];
 }
+
 function initializeBoard() {
     createBoard();
 
-    var values = ["R1", "N1", "B1", "Q", "K", "B2", "N2", "R2"];
+    var values = ["r0", "n1", "b2", "q3", "k4", "b5", "n6", "r7",
+                  "p8", "p9", "p10", "p11", "p12", "p13", "p14", "p15",
+                  "p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7",
+                  "r8", "n9", "b10", "q11", "k12", "b13", "n14", "r15"];
+    var valuesCounter = 0;
 
     var enemySide;
     var sideIndex;
     var enemySideIndex;
 
     if (user.side == "white") {
-        enemySide = "black";
         sideIndex = 1;
-        enemySideIndex = 0;
+        enemySide = "black";
+        enemySideIndex = 0;     
         document.getElementById("centralBoard").style.pointerEvents = 'auto';         
     } else {
+        var v = values[3];
+        values[3] = values[4];
+        values[4] = v;
+        v = values[27];
+        values[27] = values[28];
+        values[28] = v;
+
+        values.reverse();
+
         enemySide = "white";
         sideIndex = 0;
         enemySideIndex = 1;
@@ -309,11 +334,12 @@ function initializeBoard() {
 
         board[i].div.appendChild(img);
 
-        board[i].figure = {
-            value: values[i],
+        board[i].piece = {
+            value: values[valuesCounter],
             side: enemySide,
             img: img
         };
+        valuesCounter++;
     }
     //enemy pawns row initialize
     for (var i = 10; i < 18; i++) {
@@ -322,15 +348,16 @@ function initializeBoard() {
 
         board[i].div.appendChild(img);
 
-        board[i].figure = {
-            value: 'P' + (i - 10),
+        board[i].piece = {
+            value: values[valuesCounter],
             side: enemySide,
             img: img,
             enPassant: 0
         };
+        valuesCounter++;
     }
     
-   //your pawns row initialize
+    //your pawns row initialize
     var imgId;
 
     for (var i = 60; i < 68; i++) {
@@ -338,16 +365,18 @@ function initializeBoard() {
         img.src = imgSrcArr[sideIndex][8];
         img.style.cursor = "pointer";
         img.addEventListener("click", pawnTurnZones, false);
-        imgId = 'P' + (i - 60);
+        imgId = values[valuesCounter];
         img.id = imgId;
         board[i].div.appendChild(img);
             
-        board[i].figure = {
+        board[i].piece = {
             value: imgId,
             side: user.side,
             img: img,
             enPassant: 0
         };
+
+        valuesCounter++;
     }
    
     //your others row initialize
@@ -359,82 +388,80 @@ function initializeBoard() {
         img.src = imgSrcArr[sideIndex][j];
         img.style.cursor = "pointer";
         img.addEventListener("click", funcArr[j], false);
-        imgId = values[j];
+        imgId = values[valuesCounter];
         img.id = imgId;
 
         board[i].div.appendChild(img);
 
-        board[i].figure = {
+        board[i].piece = {
             value: imgId,
             side: user.side,
             img: img
         };
+        valuesCounter++;
     }
-  
+
+    piecesCounter = 16;
+
     initializeExchangeWindow();
 
     //king and rooks isFirstTurn property for castling mechanics
 
     if (user.side == "black") {
         //swap king and queen if user side == black
-        var king = board[73];
-        var queen = board[74];
-        var kingFigure = king.figure;
+        var blackKing = board[73];
+        var blackQueen = board[74];
+        var BKPiece = blackKing.piece;
 
-        king.div.removeChild(king.figure.img);
-        queen.div.removeChild(queen.figure.img);
+        blackKing.div.removeChild(blackKing.piece.img);
+        blackQueen.div.removeChild(blackQueen.piece.img);
 
-        king.div.appendChild(queen.figure.img);
-        queen.div.appendChild(king.figure.img);
+        blackKing.div.appendChild(blackQueen.piece.img);
+        blackQueen.div.appendChild(blackKing.piece.img);
 
-        king.figure = queen.figure;
-        queen.figure = kingFigure;
-
-        //----------------------------------//
-
-        var enemyKing = board[3];
-        var enemyQueen = board[4];
-        var enemyKingFigure = enemyKing.figure;
-
-        enemyKing.div.removeChild(enemyKing.figure.img);
-        enemyQueen.div.removeChild(enemyQueen.figure.img);
-
-        enemyKing.div.appendChild(enemyQueen.figure.img);
-        enemyQueen.div.appendChild(enemyKing.figure.img);
-
-        enemyKing.figure = enemyQueen.figure;
-        enemyQueen.figure = enemyKingFigure;
+        blackKing.piece = blackQueen.piece;
+        blackQueen.piece = BKPiece;
 
         //----------------------------------//
-        king.figure.isFirstTurn = true;
+
+        var whiteKing = board[3];
+        var whiteQueen = board[4];
+        var WKPiece = whiteKing.piece;
+
+        whiteKing.div.removeChild(whiteKing.piece.img);
+        whiteQueen.div.removeChild(whiteQueen.piece.img);
+
+        whiteKing.div.appendChild(whiteQueen.piece.img);
+        whiteQueen.div.appendChild(whiteKing.piece.img);
+
+        whiteKing.piece = whiteQueen.piece;
+        whiteQueen.piece = WKPiece;
+
+        //----------------------------------//
+        blackKing.piece.isFirstTurn = true;
         
     } else {
-        board[74].figure.isFirstTurn = true;
+        board[74].piece.isFirstTurn = true;
     }
 
-    board[70].figure.isFirstTurn = true;
-    board[77].figure.isFirstTurn = true;
+    board[70].piece.isFirstTurn = true;
+    board[77].piece.isFirstTurn = true;
     
 }//TEST FIGURES
-function getRandomInt(min, max) {
-    min = Math.ceil(min);
-    max = Math.floor(max);
-    return Math.floor(Math.random() * (max - min)) + min;
-}//to delete
 
-function figureAction(event) {
+function pieceAction(event) {
     if (turnZones.length > 0) {
         var turnInfo = null;
         try {
             if (this.classList.contains(TURN_ZONE)) {
-                turnInfo = moveFigure(this.id, "move");
-            } else if (board[this.id].figure != null && this.classList.contains(BEAT_ZONE)) {
-                turnInfo = moveFigure(this.id, "beat");
-            } else if (board[this.id].figure == null && this.classList.contains(BEAT_ZONE)) {
-                //взятие на проходе(en passan)
-                turnInfo = moveFigure(this.id, "enPassan");
+                turnInfo = movePiece(this.id, MOVE_TURN);
+            } else if (board[this.id].piece != null && this.classList.contains(BEAT_ZONE)) {
+                turnInfo = movePiece(this.id, BEAT_TURN);
+            } else if (board[this.id].piece == null && this.classList.contains(BEAT_ZONE)) {
+                //enPassant
+                turnInfo = movePiece(this.id, ENPASSANT_TURN);
             } else if (this.classList.contains(CASTLING_ZONE)) {
-                turnInfo = moveFigure(this.id, "castling");
+                turnInfo = movePiece(this.id, CASTLING_TURN);
             }
             if (turnInfo != null) {
                 timer.pause();
@@ -448,58 +475,56 @@ function figureAction(event) {
             console.log(e);
         }               
     }
-}//INTERVAL INTERVAL INTERVAL
+}
 
-//move figure
-function moveFigure(toId, turnType) { 
+//MOVE PIECE
+function movePiece(toId, turnType) { 
     var fromId = turnZones[0];
-    var figure = board[fromId].figure;
+    var pieceToMove = board[fromId].piece;
 
 
-    if (figure.side == user.side && figure.hasOwnProperty('isFirstTurn') && figure.isFirstTurn == true) {
-        figure.isFirstTurn = false;
+    if (pieceToMove.side == user.side && pieceToMove.hasOwnProperty('isFirstTurn') && pieceToMove.isFirstTurn == true) {
+        pieceToMove.isFirstTurn = false;
     }                              
-    if (!(figure.value[0] == 'P' && (toId < 8 || toId > 69))) {
-        showNotation(fromId, figure);
+    if (!(pieceToMove.value[0] == 'p' && (toId < 8 || toId > 69))) {
+        showNotation(fromId, pieceToMove);
     }
 
-    if (turnType == "move") {
-        move();       
-    } else if (turnType == "beat") {
+    if (turnType == MOVE_TURN) {
+        move();
+    } else if (turnType == BEAT_TURN) {
         beat();
-    } else if (turnType == "enPassan") {
-        enPassan();
-    } else if (turnType == "castling") {
+    } else if (turnType == ENPASSANT_TURN) {
+        enPassant();
+    } else if (turnType == CASTLING_TURN) {
         castling();     
     }
- 
-    //turnsCount++;   
-    
+
     var turnInfo = {
         "turnType": turnType,
         "pointA": +fromId,
         "pointB": +toId,
-        "turnCount": turnsCount,
+        "turnCount": turnsCounter,
         "isAttacked": 0,
         "isPotentiallyAttacked": false,
-        "figureToExchange": null,
+        "pieceToExchange": null,
         "attackedZones": [],
         "defenceZones": []
     }
 
-    if (toId < 8 && board[toId].figure != null && board[toId].figure.value[0] == 'P') {
+    if (toId < 8 && board[toId].piece != null && board[toId].piece.value[0] == 'p') {
         exchangeInfo = {
             "fromId": +fromId,
             "turnType": turnType
         }       
 
         for (var i = 0; i < 4; i++) {
-            var figure = document.getElementById('figToExchange' + i);
-            figure.turnInfo = turnInfo;
+            var pieceToExchange = document.getElementById('pieceToExchange' + i);
+            pieceToExchange.turnInfo = turnInfo;
         }
         showExchangeWindow();       
         hideTurnZones();
-        throw "user select figure...";
+        throw "user select a piece...";
     }
 
     return turnInfo;   
@@ -507,52 +532,52 @@ function moveFigure(toId, turnType) {
     function move() {
         var from = board[fromId];
         var to = board[toId];
-        var figure = from.figure;
+        var piece = from.piece;
 
-        from.div.removeChild(figure.img);
-        from.figure = null;
+        from.div.removeChild(piece.img);
+        from.piece = null;
 
-        to.div.appendChild(figure.img);
-        to.figure = figure;   
+        to.div.appendChild(piece.img);
+        to.piece = piece;   
     }
     function beat() {
         var from = board[fromId];
         var to = board[toId];
-        var figure = from.figure;
+        var piece = from.piece;
 
-        to.div.removeChild(to.figure.img);
+        to.div.removeChild(to.piece.img);
 
-        from.div.removeChild(figure.img);
-        from.figure = null;
+        from.div.removeChild(piece.img);
+        from.piece = null;
 
-        to.div.appendChild(figure.img);
-        to.figure = figure;
+        to.div.appendChild(piece.img);
+        to.piece = piece;
     }
-    function enPassan() {
+    function enPassant() {
         var from = board[fromId];
         var to = board[toId];
         var toBeat = +toId > 40 ? board[+toId - 10] : board[+toId + 10];
-        var figure = from.figure;
+        var piece = from.piece;
 
-        from.div.removeChild(figure.img);
-        from.figure = null;
+        from.div.removeChild(piece.img);
+        from.piece = null;
 
-        to.div.appendChild(figure.img);
-        to.figure = figure;
+        to.div.appendChild(piece.img);
+        to.piece = piece;
 
-        toBeat.div.removeChild(toBeat.figure.img);
-        toBeat.figure = null;
+        toBeat.div.removeChild(toBeat.piece.img);
+        toBeat.piece = null;
     }
     function castling() {
         var king = board[fromId];
         var rook = board[toId];
-        var kingFigure = king.figure;
-        var rookFigure = rook.figure;
+        var kingPiece = king.piece;
+        var rookPiece = rook.piece;
 
-        rook.div.removeChild(rook.figure.img);
-        king.div.removeChild(king.figure.img);
-        rook.figure = null;
-        king.figure = null;
+        rook.div.removeChild(rook.piece.img);
+        king.div.removeChild(king.piece.img);
+        rook.piece = null;
+        king.piece = null;
 
         var newKingId;
         var newRookId;
@@ -560,41 +585,41 @@ function moveFigure(toId, turnType) {
         if (toId == 70 || toId == 0) {
             newKingId = +fromId - 2;
             newRookId = +fromId - 1;
-        } else if (toId == 77 || toId == 7){//77
+        } else if (toId == 77 || toId == 7){
             newKingId = +fromId + 2;
             newRookId = +fromId + 1;
         }
-        board[newKingId].div.appendChild(kingFigure.img);
-        board[newKingId].figure = kingFigure;
+        board[newKingId].div.appendChild(kingPiece.img);
+        board[newKingId].piece = kingPiece;
 
-        board[newRookId].div.appendChild(rookFigure.img);
-        board[newRookId].figure = rookFigure;
+        board[newRookId].div.appendChild(rookPiece.img);
+        board[newRookId].piece = rookPiece;
     }  
 
     function showNotation() {
         notations.innerHTML += ' ';
 
-        if (user.side == "white" && figure.side == user.side) {
-            var x = Math.ceil((turnsCount + 1) / 2) + '.';
+        if (user.side == "white" && pieceToMove.side == user.side) {
+            var x = Math.ceil((turnsCounter + 1) / 2) + '.';
             notations.innerHTML += x;
             notations.innerHTML = notations.innerHTML.replace(x, '<span style="font-weight: 700;">' + x + '</span>');
-        } else if (user.side == "black" && figure.side != user.side) {
-            var x = Math.ceil((turnsCount) / 2) + '.';
+        } else if (user.side == "black" && pieceToMove.side != user.side) {
+            var x = Math.ceil((turnsCounter) / 2) + '.';
             notations.innerHTML += x;
             notations.innerHTML = notations.innerHTML.replace(x, '<span style="font-weight: 700;">' + x + '</span>');
         }
-
+       
         var fromCoord = board[fromId].div.getAttribute("name");
         var toCoord = board[toId].div.getAttribute("name");
-        var fromValue = board[fromId].figure.value[0];
+        var fromValue = board[fromId].piece.value[0].toUpperCase();
 
-        if (turnType == "move") {
-            notations.innerHTML += fromValue == 'P' ? toCoord : translateToUA(fromValue) + isMoveUnambiguity() + toCoord;
-        } else if (turnType == "beat") {
-            notations.innerHTML += fromValue == 'P' ? fromCoord[0] + 'x' + toCoord : translateToUA(fromValue) + isMoveUnambiguity() + 'x' + toCoord;
-        } else if (turnType == "enPassan") {
+        if (turnType == MOVE_TURN) {
+            notations.innerHTML += fromValue == 'P' ? toCoord : fromValue + isMoveUnambiguity() + toCoord;
+        } else if (turnType == BEAT_TURN) {
+            notations.innerHTML += fromValue == 'P' ? fromCoord[0] + 'x' + toCoord : fromValue + isMoveUnambiguity() + 'x' + toCoord;
+        } else if (turnType == ENPASSANT_TURN) {
             notations.innerHTML += fromCoord[0] + 'x' + toCoord;
-        } else if (turnType == "castling") {
+        } else if (turnType == CASTLING_TURN) {
             notations.innerHTML += toId - fromId == -3 || toId - fromId == 3 ? "0-0" : "0-0-0";
         }
 
@@ -602,36 +627,22 @@ function moveFigure(toId, turnType) {
             var vertical = '';
             var horizontal = '';
             var onTheSameLine = false;
-            var figureValue;
+            var pieceValue;
 
-            if (fromValue == 'R') {
-                figureValue = 'R';
+            if (fromValue == 'r') {
+                pieceValue = 'r';
 
-                checkLine(-10);
-                checkLine(1);
-                checkLine(10);
-                checkLine(-1);
-            } else if (fromValue == 'Q') {
-                figureValue = 'Q';
+                ROOK_MOVE_INDEXES.forEach(i => checkLine(i));             
+            } else if (fromValue == 'q') {
+                pieceValue = 'q';
 
-                checkLine(-9);
-                checkLine(-10);
-                checkLine(11);
-                checkLine(1);
-                checkLine(9);
-                checkLine(10);
-                checkLine(-11);
-                checkLine(-1);
-            } else if (fromValue == 'B') {
-                figureValue = 'B';
+                QUEEN_MOVE_INDEXES.forEach(i => checkLine(i));               
+            } else if (fromValue == 'b') {
+                pieceValue = 'b';
 
-                checkLine(-9);
-                checkLine(11);
-                checkLine(9);
-                checkLine(-11);
-
-            } else if (fromValue == 'K') {
-                figureValue = 'K';
+                BISHOP_MOVE_INDEXES.forEach(i => checkLine(i));  
+            } else if (fromValue == 'k') {
+                pieceValue = 'k';
 
                 checkPoints(toId);
             }
@@ -644,7 +655,6 @@ function moveFigure(toId, turnType) {
                 }
                 return vertical + horizontal;
             }
-            //однозначность == true
 
             function checkLine(step) {
                 var i = +toId + step;
@@ -652,10 +662,10 @@ function moveFigure(toId, turnType) {
                 while (board[i] != null) {
                     var elem = board[i];
 
-                    if (elem.figure != null) {
+                    if (elem.piece != null) {
 
-                        if (elem.figure.side == board[fromId].figure.side
-                            && elem.figure.value[0] == figureValue
+                        if (elem.piece.side == board[fromId].piece.side
+                            && elem.piece.value[0] == pieceValue
                             && elem.div.id != fromId) {
 
                             onTheSameLine = true;
@@ -686,9 +696,9 @@ function moveFigure(toId, turnType) {
                     var elem = board[points[i]];
 
                     if (elem != null) {
-                        if (elem.figure != null) {
-                            if (elem.figure.side == board[fromId].figure.side
-                                && elem.figure.value[0] == figureValue
+                        if (elem.piece != null) {
+                            if (elem.piece.side == board[fromId].piece.side
+                                && elem.piece.value[0] == pieceValue
                                 && elem.div.id != fromId) {
 
                                 onTheSameLine = true;
@@ -704,158 +714,121 @@ function moveFigure(toId, turnType) {
                     }
                 }
             }
-        }
-        function translateToUA(value) {
-            switch (value) {
-                case 'R':
-                    return 'Т';
-                case 'N':
-                    return 'К';
-                case 'B':
-                    return 'С';
-                case 'Q':
-                    return 'Ф';
-                case 'K':
-                    return 'Кр';
-                default:
-                    return '?';
-            }
-        }
+        }      
     }
-}//done
+}
 
 
-//change pawn figure after reach top line
-function exchangeFigure(turnInfo) {
+//EXCHANGE PAWN (WHEN REACH TOP LINE)
+function exchangePiece(turnInfo) {
     notations.innerHTML += ' '
 
     var elem = board[turnInfo.pointB];
-    var i = elem.figure.side == "black" ? 0 : 1;
+    var i = elem.piece.side == "black" ? 0 : 1;
 
     var fromCoord = board[turnInfo.pointA].div.getAttribute("name");
     var toCoord = board[turnInfo.pointB].div.getAttribute("name");
-    var n = turnInfo.turnType == "move" ? '' : fromCoord[0] + 'x';
-    var figureUA;
+    var n = turnInfo.turnType == MOVE_TURN ? '' : fromCoord[0] + 'x';
 
     var newImg = document.createElement("img");
 
-    switch (turnInfo.figureToExchange) {              
+    switch (turnInfo.pieceToExchange) {              
         case 'r':
             newImg.src = imgSrcArr[i][0];
-            newImg.id = 'R' + turnsCount;
-            if (user.side == elem.figure.side) {
-                newImg.addEventListener("click", rookTurnZones, false);
+            newImg.id = 'r' + piecesCounter;
+            if (user.side == elem.piece.side) {
+                newImg.addEventListener("click", linearTurnZones, false);
             }
-            figureUA = 'Т';
             break;
         case 'n':
             newImg.src = imgSrcArr[i][1];
-            newImg.id = 'N' + turnsCount;
-            if (user.side == elem.figure.side) {
+            newImg.id = 'n' + piecesCounter;
+            if (user.side == elem.piece.side) {
                 newImg.addEventListener("click", knightTurnZones, false);
             }
-            figureUA = 'К';
             break;
         case 'b':
             newImg.src = imgSrcArr[i][2];
-            newImg.id = 'B' + turnsCount;
-            if (user.side == elem.figure.side) {
-                newImg.addEventListener("click", bishopTurnZones, false);
+            newImg.id = 'b' + piecesCounter;
+            if (user.side == elem.piece.side) {
+                newImg.addEventListener("click", linearTurnZones, false);
             }
-            figureUA = 'С';
             break;
         case 'q':
             newImg.src = imgSrcArr[i][3];
-            newImg.id = 'Q' + turnsCount;
-            if (user.side == elem.figure.side) {
-                newImg.addEventListener("click", queenTurnZones, false);
+            newImg.id = 'q' + piecesCounter;
+            if (user.side == elem.piece.side) {
+                newImg.addEventListener("click", linearTurnZones, false);
             }
-            figureUA = 'Ф';
             break;
     }
-    elem.div.removeChild(elem.figure.img);
+    piecesCounter++;
+    elem.div.removeChild(elem.piece.img);
     elem.div.appendChild(newImg)
-    elem.figure = {
+    elem.piece = {
         value: newImg.id,
-        side: elem.figure.side,
+        side: elem.piece.side,
         img: newImg
     }
     elem.div.style.cursor = "pointer";
 
-    if (user.side == "white" && elem.figure.side == user.side) {
-        var x = Math.ceil((turnsCount + 1) / 2) + '.';
+    if (user.side == "white" && elem.piece.side == user.side) {
+        var x = Math.ceil((turnsCounter + 1) / 2) + '.';
         notations.innerHTML += x;
         notations.innerHTML = notations.innerHTML.replace(x, '<span style="font-weight: 700;">' + x + '</span>');
-    } else if (user.side == "black" && elem.figure.side != user.side) {
-        var x = Math.ceil((turnsCount) / 2) + '.';
+    } else if (user.side == "black" && elem.piece.side != user.side) {
+        var x = Math.ceil((turnsCounter) / 2) + '.';
         notations.innerHTML += x;
         notations.innerHTML = notations.innerHTML.replace(x, '<span style="font-weight: 700;">' + x + '</span>');
     }
 
-    notations.innerHTML += n + toCoord + '=' + figureUA;
-}//done
+    notations.innerHTML += n + toCoord + '=' + elem.piece.value[0].toUpperCase();
+}
 function showExchangeWindow() {
     document.getElementById("centralBoard").style.pointerEvents = 'none';
     var elem = document.getElementById("exchangeContainer");
     elem.classList.toggle("show");   
-}//done
+}
 function initializeExchangeWindow() {  
     var side = user.side == "white" ? 1 : 0;
-
-    //var topLeftElem = document.getElementById("0");
-    //var squareWidth = topLeftElem.offsetWidth;
-
     var newMargin = document.getElementById("numbers").offsetWidth;
-
-  
     var exchangeContainer = document.getElementById("exchangeContainer");
-    var hideVarElem = document.getElementById("hideVariants");
-
-    //hideVarElem.style.height = (squareWidth + 3) + "px";
-    exchangeContainer.style.marginLeft = newMargin + "px";
-
-    
-    //var gameActions = document.getElementById("gameActions");
-
-    //exchangeContainer.style.backgroundColor = window.getComputedStyle(gameActions, null).getPropertyValue('background-color');
-
-    var elems = document.getElementsByClassName("figureImg");
-
+    var hideVarElem = document.getElementById("hideVariants");  
+    var elems = document.getElementsByClassName("pieceImg");
     var j = 3;
 
-    for (var i of elems) {
-        //i.style.width = (squareWidth + 3) + "px";
-        //i.style.height = (squareWidth + 3) + "px";
+    exchangeContainer.style.marginLeft = newMargin + "px";
 
+    for (var i of elems) {
         var img = document.createElement("img");
         img.src = imgSrcArr[side][j];
-        img.id = 'figToExchange' + j;
+        img.id = "pieceToExchange" + j;
         img.name = j;
    
         img.addEventListener("click", function (event) {
             document.getElementById("exchangeContainer").classList.toggle("show");
 
-            var figToEx;
+            var pieceToEx;
 
             switch (this.name) {
                 case "3":
-                    figToEx = 'q';
+                    pieceToEx = 'q';
                     break;
                 case "2":   
-                    figToEx = 'b';
+                    pieceToEx = 'b';
                     break;
                 case "1":
-                    figToEx = 'n';
+                    pieceToEx = 'n';
                     break;
                 case "0":
-                    figToEx = 'r';
+                    pieceToEx = 'r';
                     break;
             }
 
             var turnInfo = this.turnInfo;
-            turnInfo.figureToExchange = figToEx;
+            turnInfo.pieceToExchange = pieceToEx;
 
-            exchangeFigure(turnInfo);
+            exchangePiece(turnInfo);
 
             connection.invoke("MakeTurn", user.name, turnInfo).catch(function (err) {
                 return console.error(err.toString());
@@ -866,164 +839,161 @@ function initializeExchangeWindow() {
         j--;
     }
 
-    hideVarElem.addEventListener("click", showHideExchangeFigures);
-}//done
-function showHideExchangeFigures() {
+    hideVarElem.addEventListener("click", showHideExchangePieces);
+}
+function showHideExchangePieces() {
     var arrow = document.getElementById("arrow");
     arrow.innerHTML = (arrow.innerHTML === "⯇") ? "⯈" : "⯇";
     document.getElementById("exchangeVariants").classList.toggle("show");
 }
-//figures turn zones
+
+//FIGURES TURN ZONES
 function pawnTurnZones(event) {
     var id = this.parentNode.id;
 
     if (!board[id].div.classList.contains(IS_PICKED)) {
         hideTurnZones();
-
         turnZones[0] = id;
+        board[id].div.classList.toggle(IS_PICKED);
+        
+        var turnState = null; //0 - standart moving, 1 - start defence, 2 - continue defence
+
+        if (isKingAttacked > 0) {
+            if (board[id].isForDefend == false && isKingAttacked < 2) {
+                turnState = 1;              
+            }
+        } else if (board[id].isForDefend == true && isKingPotentiallyAttacked == true) {
+            turnState = 2;
+        } else {//simple moving
+            turnState = 0;          
+        }
+
+        if (turnState != null) {
+            showMoveZones();
+            showBeatZones();
+        }      
+    }
+    event.stopPropagation();
+
+    function showMoveZones() {
+        var p1 = board[id - 10];//point1
+        var p2 = board[id - 20];//point2
+       
+        if (isEmptyPlace(p1)) {
+            if (specMoveCondition(p1, turnState, id)) {
+                oneCellMove(p1);
+            }
+            if (id[0] == 6) {
+                if (isEmptyPlace(p2) && specMoveCondition(p2, turnState, id)) {
+                    oneCellMove(p2);
+                }
+            }
+        } 
+        function isEmptyPlace(point) {
+            if (point != null && point.piece == null) return true;
+            return false;
+        }  
+        function oneCellMove(point) {
+            point.div.classList.toggle(TURN_ZONE);
+            turnZones.push(point.div.id);
+        }      
+    }
+    function showBeatZones() {
+        var e1 = board[id - 11];//enemy1
+        var e2 = board[id - 9];//enemy2
+
+        var e1EnPassant = board[id - 1];       
+        var e2EnPassant = board[+id + 1];
+      
+        checkIfEnemy(e1, e1EnPassant);
+        checkIfEnemy(e2, e2EnPassant);  
+
+        function checkIfEnemy(enemy, enPassant) {
+            if (enemy != null) {
+                if (enemy.piece != null) {
+                    if (enemy.piece.side != user.side && specBeatCondition(enemy, turnState, id)) {
+                        enemyBeatMove(enemy);
+                    }
+                } else if (id[0] == 3 && enPassant.piece != null) {
+                    if (enPassant.piece.value[0] == 'p'
+                        && enPassant.piece.enPassant == turnsCounter
+                        && specBeatCondition(enPassant, turnState, id)) {
+                        enemyBeatMove(enemy);
+                    }
+                }
+            }
+        }
+        function enemyBeatMove(enemy) {
+            enemy.div.classList.toggle(BEAT_ZONE);
+            turnZones.push(enemy.div.id);
+        }
+    } 
+}
+function linearTurnZones(event) {
+    var id = this.parentNode.id;
+    var moveIndexes;
+    var turnState = null;//0 - standart moving, 1 - start defence, 2 - continue defence
+
+    switch (board[id].piece.value[0]) {
+        case 'r':
+            if (board[id].div.classList.contains(CASTLING_ZONE)) return;
+            moveIndexes = ROOK_MOVE_INDEXES;
+            break;
+        case 'b':
+            moveIndexes = BISHOP_MOVE_INDEXES;
+            break;
+        case 'q':
+            moveIndexes = QUEEN_MOVE_INDEXES;
+            break;
+    }
+
+    if (!board[id].div.classList.contains(IS_PICKED)) {
+        hideTurnZones();
+
+        turnZones[0] = id;//access to caller id(last index);
 
         board[id].div.classList.toggle(IS_PICKED);
 
         if (isKingAttacked > 0) {
             if (board[id].isForDefend == false && isKingAttacked < 2) {
-                kingDefendZones();
+                turnState = 1;
             }
-        } else if (isKingPotentiallyAttacked == true && board[id].isForDefend == true) {
-            kingDefendZones();
-        } else {//simple moving
-            var p1 = board[id - 10];//point1
+        } else if (board[id].isForDefend == true && isKingPotentiallyAttacked == true) {
+            turnState = 2;
+        } else {
+            turnState = 0;
+        }
 
-            if (id[0] != 6) {
-                if (isEmptyPlace(p1)) {
-                    oneCellMove(p1);
-                }
-            } else if (isEmptyPlace(p1)) {
-                oneCellMove(p1);
-
-                var p2 = board[id - 20];//point2
-
-                if (isEmptyPlace(p2)) {
-                    oneCellMove(p2);
-                }
-            }
-
-            var e1 = board[id - 11];//enemy1
-            var e2 = board[id - 9];//enemy2
-            var side = board[id].figure.side;
-
-            if (e1 != null) {
-                if (e1.figure != null) {
-                    if (e1.figure.side != side) {
-                        enemyBeatMove(e1);
-                    }
-                } else if (id[0] == 3 && board[id - 1].figure != null) {
-                    if (board[id - 1].figure.value[0] == 'P' && board[id - 1].figure.enPassant == turnsCount) {
-                        enemyBeatMove(e1);
-                    }
-                }
-            }
-            if (e2 != null) {
-                if (e2.figure != null) {
-                    if (e2.figure.side != side) {
-                        enemyBeatMove(e2);
-                    }
-                } else if (id[0] == 3 && board[+id + 1].figure != null) {
-                    if (board[+id + 1].figure.value[0] == 'P' && board[+id + 1].figure.enPassant == turnsCount) {
-                        enemyBeatMove(e2);
-                    }
-                }
-            }
+        if (turnState != null) {
+            moveIndexes.forEach(i => showTurnZones(i));
         }
     }
     event.stopPropagation();
 
-    function oneCellMove(point) {
-        point.div.classList.toggle(TURN_ZONE);
-        turnZones.push(point.div.id);
-    }
-    function enemyBeatMove(enemy) {
-        enemy.div.classList.toggle(BEAT_ZONE);
-        turnZones.push(enemy.div.id);
-    }
-    function isEmptyPlace(point) {
-        if (point != null && point.figure == null) return true;
-        return false;
-    }
-    function kingDefendZones() {
-        var e1 = board[id - 11];//enemy 1
-        var e2 = board[id - 9];//enemy 2
+    function showTurnZones(step) {
+        var i = (+id) + step;
 
-        if (e1 != null) {
-            if (e1.figure != null) {
-                if (e1.figure.side != user.side && e1.isForDefend == true) {
-                    enemyBeatMove(e1);
+        while (board[i] != null) {
+            if (board[i].piece == null) {
+                if (specMoveCondition(board[i], turnState, id)) {
+                    board[i].div.classList.toggle(TURN_ZONE);
+                    turnZones.push('' + i);
                 }
-            } else if (id[0] == 3 && board[id - 1].figure != null) {
-                if (board[id - 1].isForDefend == true && board[id - 1].figure.value[0] == 'P' && board[id - 1].figure.enPassant == turnsCount) {
-                    enemyBeatMove(e1);
+
+            } else if (board[i].piece.side != user.side) {
+                if (specBeatCondition(board[i], turnState, id)) {
+                    board[i].div.classList.toggle(BEAT_ZONE);
+                    turnZones.push('' + i);
                 }
+                break;
             }
-        }
-        if (e2 != null) {
-            if (e2.figure != null) {
-                if (e2.figure.side != user.side && e2.isForDefend == true) {
-                    enemyBeatMove(e2);
-                }
-            } else if (id[0] == 3 && board[id - 1].figure != null) {
-                if (board[+id + 1].isForDefend == true && board[+id + 1].figure.value[0] == 'P' && board[+id + 1].figure.enPassant == turnsCount) {
-                    enemyBeatMove(e2);
-                }
+            else {
+                break;
             }
-        }
-       
-        var p1 = board[id - 10];//point1
-
-        if (isEmptyPlace(p1)) {
-            if (p1.isForDefend == true) {
-                oneCellMove(p1);
-            }            
-            if (id[0] == 6) {
-                var p2 = board[id - 20];//point2
-
-                if (isEmptyPlace(p2) && p2.isForDefend == true) {
-                    oneCellMove(p2);
-                }
-            }
-        } 
-    }    
-}//done?
-function rookTurnZones(event) {
-    var id = this.parentNode.id;
-    if (!board[id].div.classList.contains(CASTLING_ZONE)) {
-        if (!board[id].div.classList.contains(IS_PICKED)) {
-            hideTurnZones();
-
-            turnZones[0] = id;//access to caller id(last index);
-
-            board[id].div.classList.toggle(IS_PICKED);
-
-            if (isKingAttacked > 0) {
-                if (board[id].isForDefend == false && isKingAttacked < 2) {
-                    showKingDefendZones(+id, -10);
-                    showKingDefendZones(+id, 1);
-                    showKingDefendZones(+id, 10);
-                    showKingDefendZones(+id, -1);
-                }
-            } else if (isKingPotentiallyAttacked == true && board[id].isForDefend == true) {
-                showKingDefendZones(+id, -10);
-                showKingDefendZones(+id, 1);
-                showKingDefendZones(+id, 10);
-                showKingDefendZones(+id, -1);
-            } else {
-                showTurnZones(+id, -10);
-                showTurnZones(+id, 1);
-                showTurnZones(+id, 10);
-                showTurnZones(+id, -1);
-            }
-        }
-        event.stopPropagation();
+            i += step;
+        }        
     }
-}//done?
+}
 function knightTurnZones(event) {
     var id = this.parentNode.id;
 
@@ -1031,6 +1001,8 @@ function knightTurnZones(event) {
         hideTurnZones();
 
         turnZones[0] = id;//access to caller id(0 index);
+
+        var turnState = null;//0 - standart moving, 1 - start defence, 2 - continue defence
 
         board[id].div.classList.toggle(IS_PICKED);
 
@@ -1041,124 +1013,40 @@ function knightTurnZones(event) {
 
         if (isKingAttacked > 0) {
             if (board[id].isForDefend == false && isKingAttacked < 2) {
-                kingDefendZones();
+                turnState = 1;
             }
         } else if (isKingPotentiallyAttacked == true && board[id].isForDefend == true) {
-            kingDefendZones();
+            turnState = 2;
         } else {
+            turnState = 0;          
+        }
 
-            for (var i in points) {
-                var elem = board[points[i]];
+        if (turnState != null) {
+            showTurnZones();
+        }
+    }
+    event.stopPropagation();
+  
+    function showTurnZones() {
+        for (var i in points) {
+            var elem = board[points[i]];
 
-                if (elem != null) {
-                    if (elem.figure == null) {
+            if (elem != null) {
+                if (elem.piece == null) {
+                    if (specMoveCondition(elem, turnState, id)) {
                         elem.div.classList.toggle(TURN_ZONE);
                         turnZones.push(elem.div.id);
-                    } else if (elem.figure.side != user.side) {
+                    }
+                } else if (elem.piece.side != user.side) {
+                    if (specBeatCondition(elem, turnState, id)) {
                         elem.div.classList.toggle(BEAT_ZONE);
                         turnZones.push(elem.div.id);
                     }
                 }
             }
-        }
+        }       
     }
-    event.stopPropagation();
-    function kingDefendZones() {
-        for (var i in points) {
-            var elem = board[points[i]];
-
-            if (elem != null) {
-                if (elem.figure == null) {
-                    if (elem.isForDefend == true) {
-                        elem.div.classList.toggle(TURN_ZONE);
-                        turnZones.push(elem.div.id);
-                    }                   
-                } else if (elem.figure.side != user.side) {
-                    if (elem.isForDefend == true) {
-                        elem.div.classList.toggle(BEAT_ZONE);
-                        turnZones.push(elem.div.id);
-                    }                   
-                }
-            }
-        }
-    }
-}//done?
-function bishopTurnZones(event) {
-    var id = this.parentNode.id;
-
-    if (!board[id].div.classList.contains(IS_PICKED)) {
-        hideTurnZones();
-
-        turnZones[0] = id;//access to caller id(last index);
-
-        board[id].div.classList.toggle(IS_PICKED);
-
-        if (isKingAttacked > 0) {
-            if (board[id].isForDefend == false && isKingAttacked < 2) {
-                showKingDefendZones(+id, -9);
-                showKingDefendZones(+id, 11);
-                showKingDefendZones(+id, 9);
-                showKingDefendZones(+id, -11);
-            }
-        } else if (isKingPotentiallyAttacked == true && board[id].isForDefend == true) {
-            showKingDefendZones(+id, -9);
-            showKingDefendZones(+id, 11);
-            showKingDefendZones(+id, 9);
-            showKingDefendZones(+id, -11);
-        } else {
-            showTurnZones(+id, -9);
-            showTurnZones(+id, 11);
-            showTurnZones(+id, 9);
-            showTurnZones(+id, -11);
-        }      
-        
-    }
-    
-    event.stopPropagation();
-}//done?
-function queenTurnZones(event) {
-    var id = this.parentNode.id;
-
-    if (!board[id].div.classList.contains(IS_PICKED)) {
-        hideTurnZones();
-
-        turnZones[0] = id;//access to caller id(last index);
-
-        board[id].div.classList.toggle(IS_PICKED);
-
-        if (isKingAttacked > 0) {
-            if (board[id].isForDefend == false && isKingAttacked < 2) {
-                showKingDefendZones(+id, -10);
-                showKingDefendZones(+id, -9);
-                showKingDefendZones(+id, 1);
-                showKingDefendZones(+id, 11);
-                showKingDefendZones(+id, 10);
-                showKingDefendZones(+id, 9);
-                showKingDefendZones(+id, -1);               
-                showKingDefendZones(+id, -11);
-            }
-        } else if (isKingPotentiallyAttacked == true && board[id].isForDefend == true) {
-            showKingDefendZones(+id, -10);
-            showKingDefendZones(+id, -9);
-            showKingDefendZones(+id, 1);
-            showKingDefendZones(+id, 11);
-            showKingDefendZones(+id, 10);
-            showKingDefendZones(+id, 9);
-            showKingDefendZones(+id, -1);
-            showKingDefendZones(+id, -11);
-        } else {
-            showTurnZones(+id, -10);
-            showTurnZones(+id, -9);
-            showTurnZones(+id, 1);
-            showTurnZones(+id, 11);
-            showTurnZones(+id, 10);
-            showTurnZones(+id, 9);
-            showTurnZones(+id, -1);
-            showTurnZones(+id, -11);
-        }
-    }
-    event.stopPropagation();
-}//done?
+}
 function kingTurnZones(event) {
     var id = this.parentNode.id;
 
@@ -1178,33 +1066,33 @@ function kingTurnZones(event) {
             var elem = board[points[i]];
 
             if (elem != null) {
-                if (elem.figure == null) {
+                if (elem.piece == null) {
                     if (elem.isAttacked == false) {
                         elem.div.classList.toggle(TURN_ZONE);
                         turnZones.push(elem.div.id);
                     }                   
-                } else if (elem.figure.side != user.side && elem.isAttacked == false) {
+                } else if (elem.piece.side != user.side && elem.isAttacked == false) {
                     elem.div.classList.toggle(BEAT_ZONE);
                     turnZones.push(elem.div.id);
                 }
             }
         }
 
-        if (board[id].figure.isFirstTurn == true && isKingAttacked == 0) {
-            if (board[70].figure != null && board[70].figure.value[0] == 'R' && board[70].figure.isFirstTurn == true) {
-                if (board[id - 1].figure == null && board[id - 2].figure == null) {
+        if (board[id].piece.isFirstTurn == true && isKingAttacked == 0) {
+            if (board[70].piece != null && board[70].piece.value[0] == 'r' && board[70].piece.isFirstTurn == true) {
+                if (board[id - 1].piece == null && board[id - 2].piece == null) {
                     if (board[id - 1].isAttacked == false && board[id - 2].isAttacked == false) {
-                        if (id - 3 == 70 || board[id - 3].figure == null) {
+                        if (id - 3 == 70 || board[id - 3].piece == null) {
                             board[70].div.classList.toggle(CASTLING_ZONE);
                             turnZones.push(board[70].div.id);
                         }
                     }
                 }
             }
-            if (board[77].figure != null && board[77].figure.value[0] == 'R' && board[77].figure.isFirstTurn == true) {
-                if (board[+id + 1].figure == null && board[+id + 2].figure == null) {
+            if (board[77].piece != null && board[77].piece.value[0] == 'r' && board[77].piece.isFirstTurn == true) {
+                if (board[+id + 1].piece == null && board[+id + 2].piece == null) {
                     if (board[+id + 1].isAttacked == false && board[+id + 2].isAttacked == false) {
-                        if (+id + 3 == 77 || board[+id + 3].figure == null) {
+                        if (+id + 3 == 77 || board[+id + 3].piece == null) {
                             board[77].div.classList.toggle(CASTLING_ZONE);
                             turnZones.push(board[77].div.id);
                         }
@@ -1215,27 +1103,31 @@ function kingTurnZones(event) {
 
     }
     event.stopPropagation();   
-}//done?
+}
 
-function showTurnZones(id, step) {  
-    var i = id += step;
+function specMoveCondition(point, turnState, id) {
+    var cond = true;
+    if (turnState == 1) {
+        cond = (point.isForDefend == true
+            && point.underAttack == kingUnderAttack);
+    } else if (turnState == 2) {
+        cond = (point.isForDefend == true
+            && board[id].underAttack == point.underAttack);
+    }
+    return cond;
+}
+function specBeatCondition(point, turnState, id) {
+    var cond = true;
+    if (turnState == 1) {
+        cond = (point.isForDefend == true
+            && point.piece.value == kingUnderAttack);
+    } else if (turnState == 2) {
+        cond = (point.isForDefend == true
+            && board[id].underAttack == point.piece.value);
+    }
+    return cond;
+} 
 
-    while (board[i] != null) {
-        if (board[i].figure == null) {
-            board[i].div.classList.toggle(TURN_ZONE);
-            turnZones.push('' + i);
-
-        } else if (board[i].figure.side != user.side) {
-            board[i].div.classList.toggle(BEAT_ZONE);
-            turnZones.push('' + i);
-            break;
-        }
-        else {
-            break;
-        }
-        i += step;
-    }    
-}//done
 function hideTurnZones() {
     if (turnZones.length != 0) {
         board[turnZones[0]].div.classList.toggle(IS_PICKED);
@@ -1258,34 +1150,9 @@ function hideTurnZones() {
         }
         turnZones = [];
     }
-    //var time = performance.now();
-    //time = performance.now() - time;
-    //console.log('Время выполнения = ', time);
-}//time performance example
-function showKingDefendZones(id, step) {
-    var i = id += step;
-
-    while (board[i] != null) {
-        if (board[i].figure == null) {
-            if (board[i].isForDefend) {
-                board[i].div.classList.toggle(TURN_ZONE);
-                turnZones.push('' + i);
-            }            
-
-        } else if (board[i].figure.side != user.side) {
-            if (board[i].isForDefend) {
-                board[i].div.classList.toggle(BEAT_ZONE);
-                turnZones.push('' + i);
-            }
-            break;
-        }
-        else {
-            break;
-        }
-        i += step;
-    }    
 }
-//on connected 
+
+//ON CONNECTED 
 connection.on("ReceiveAvailableRooms", function (availableRooms) {
     document.getElementById("roomsContainer").classList.toggle("show");
 
@@ -1296,12 +1163,12 @@ connection.on("ReceiveAvailableRooms", function (availableRooms) {
     }
 });
 
-//create room
+//CREATE ROOM
 function CreateRoom(roomName, settingsIndex) {
     var e = document.getElementById("timeControl");
     var timeSet = e.options[settingsIndex].text;
 
-    var createdRoom = "Кімната " + roomName + " (" + timeSet + ").";
+    var createdRoom = "Room " + roomName + " (" + timeSet + ").";
     var li = document.createElement("li");
     var div = document.createElement("div");
 
@@ -1319,7 +1186,7 @@ function CreateRoom(roomName, settingsIndex) {
     if (user.joinedRoom != roomName) {
         var btn = document.createElement("button");
 
-        btn.innerHTML = "Увійти";
+        btn.innerHTML = "Join";
 
         btn.addEventListener("click", function (event) {
 
@@ -1331,7 +1198,7 @@ function CreateRoom(roomName, settingsIndex) {
                 });
                 event.preventDefault();
             } else {
-                alert("Спершу, видаліть свою кімнату!");
+                alert("First, delete your room!");
             }
         });
 
@@ -1359,18 +1226,19 @@ document.getElementById("createRoomButton").addEventListener("click", function (
 
     var div = CreateRoom(roomName, settingsIndex);
     document.getElementById("roomList").appendChild(div);
-
+    
     connection.invoke("CreateRoom", roomName, settingsIndex).catch(function (err) {
         return console.error(err.toString());
     });
     event.preventDefault();
 });
+
 connection.on("ReceiveCreatedRoom", function (roomName, settingsIndex) {
     var div = CreateRoom(roomName, settingsIndex);
     document.getElementById("roomList").appendChild(div);
 });
 
-//delete room
+//DELETE ROOM
 document.getElementById("deleteRoomButton").addEventListener("click", function (event) {
     hideShowRoomButtons();
 
@@ -1390,7 +1258,7 @@ connection.on("ReceiveDeletedRoom", function (roomName) {
     document.getElementById("roomList").removeChild(elementToDelete);
 });
 
-//join to room
+//JOIN TO ROOM
 connection.on("ReceiveJoinedRoom", function (roomName, settingsIndex) {
     hideShowRoomContainer();
 
@@ -1415,9 +1283,9 @@ connection.on("ReceiveJoinedRoom", function (roomName, settingsIndex) {
     getCountdown(); 
 });
 
-//give up HIDE BUTTON
+//HIDE GIVE UP BUTTON
 document.getElementById("giveUpButton").addEventListener("click", function (event) {
-    var confirmGiveUp = confirm("Ви впевнені, що хочете здатись?");
+    var confirmGiveUp = confirm("You sure?");
 
     if (confirmGiveUp == true) {
         connection.invoke("CloseGameSession", { roomName: user.joinedRoom, cause: "g" }).catch(function (err) {
@@ -1428,10 +1296,8 @@ document.getElementById("giveUpButton").addEventListener("click", function (even
     }  
 });
 
-//refresh game
+//REFRESH GAME
 document.getElementById("refreshGameButton").addEventListener("click", function (event) {
-
-    //document.getElementById("centralBoard").style.border = "solid 2px black";
     var timerBlock = document.getElementById("gameTimer");
     var gameActions = document.getElementById("gameActions");
 
@@ -1442,15 +1308,15 @@ document.getElementById("refreshGameButton").addEventListener("click", function 
 
     clearBoard();
     
-    var elems = document.getElementsByClassName("figureImg");
+    var elems = document.getElementsByClassName("pieceImg");
 
     var j = 3;
 
     for (var e of elems) {
-        e.removeChild(document.getElementById('figToExchange' + j));
+        e.removeChild(document.getElementById('pieceToExchange' + j));
         j--;
     }
-    document.getElementById("hideVariants").removeEventListener("click", showHideExchangeFigures);
+    document.getElementById("hideVariants").removeEventListener("click", showHideExchangePieces);
 
     var exchangeFigureDiv = document.getElementById("exchangeContainer");
 
@@ -1464,13 +1330,13 @@ document.getElementById("refreshGameButton").addEventListener("click", function 
     event.preventDefault();
 });
 
-//room settings
+//ROOM SETTINGS
 document.getElementById("setRoomSettings").addEventListener("click", function (event) {
     hideShowRoomSettings();
     event.preventDefault();
 });
 
-//offer a draw
+//OFFER A DRAW
 document.getElementById("drawButton").addEventListener("click", function (event) {
     document.getElementById("drawButton").classList.toggle("show");
 
@@ -1481,7 +1347,7 @@ document.getElementById("drawButton").addEventListener("click", function (event)
     event.preventDefault();
 });
 connection.on("ReceiveDrawOffer", function () {
-    var confirmADraw = confirm("Противник пропонує нічию, погоджуєтесь?");
+    var confirmADraw = confirm("Enemy offer a draw, confirm?");
 
     if (confirmADraw == true) {
         connection.invoke("CloseGameSession", { roomName: user.joinedRoom, cause: "d" }).catch(function (err) {
@@ -1491,10 +1357,7 @@ connection.on("ReceiveDrawOffer", function () {
         event.preventDefault();
     }
 });
-//reconnect
-//connection.onclose(() => {  
-//    localStorage.setItem('hello', "hello");
-//});
+
 window.addEventListener('beforeunload', (event) => {
     var boardCondition = JSON.stringify(board);
     localStorage.setItem("boardCondition", boardCondition);
@@ -1512,7 +1375,12 @@ connection.on("ReceiveReconnect", function (settings) {
     user.isInTurn = settings.isInTurn;
     user.side = settings.side;
     secondsLeft = settings.time;
-    turnsCount = settings.lastTurnInfo.turnsCount;
+    if (settings.lastTurnInfo != null) {
+        turnsCounter = settings.lastTurnInfo.turnsCount;
+    } else turnsCounter = 0;
+   
+    piecesCounter = settings.piecesCounter;
+
 
     var enemyIndex = user.side == "white" ? 0 : 1;
     var myIndex = user.side == "white" ? 1 : 0;
@@ -1523,25 +1391,25 @@ connection.on("ReceiveReconnect", function (settings) {
     for (var i = 0; i < 78; i++) {
         if (board[i] != null) {
             board[i].div = document.getElementById(i);
-            board[i].div.addEventListener("click", figureAction, false);
-            if (board[i].figure != null) {
-                switch (board[i].figure.value[0]) {
-                    case "P":
+            board[i].div.addEventListener("click", pieceAction, false);
+            if (board[i].piece != null) {
+                switch (board[i].piece.value[0]) {
+                    case "p":
                         createAndSetImg(8, 8);
                         break;
-                    case "R":
+                    case "r":
                         createAndSetImg(0, 0);
                         break;
-                    case "N":
+                    case "n":
                         createAndSetImg(1, 1);
                         break;
-                    case "B":
+                    case "b":
                         createAndSetImg(2, 2);
                         break;  
-                    case "Q":
+                    case "q":
                         createAndSetImg(3, 3);
                         break;
-                    case "K":
+                    case "k":
                         createAndSetImg(4, 4);
                         break;                    
                 }
@@ -1554,7 +1422,7 @@ connection.on("ReceiveReconnect", function (settings) {
     function createAndSetImg(imgIndex, funcIndex){
         var img = document.createElement("img");
                 
-        if (board[i].figure.side == user.side) {
+        if (board[i].piece.side == user.side) {
             img.src = imgSrcArr[myIndex][imgIndex];
             img.addEventListener("click", funcArr[funcIndex], false);
             img.style.cursor = "pointer";
@@ -1562,7 +1430,7 @@ connection.on("ReceiveReconnect", function (settings) {
             img.src = imgSrcArr[enemyIndex][imgIndex];
         }       
         board[i].div.appendChild(img);      
-        board[i].figure.img = img;
+        board[i].piece.img = img;
     }
 
     getCountdown();
@@ -1580,7 +1448,7 @@ connection.on("ReceiveReconnect", function (settings) {
 
     var x = "1.";
 
-    for (var i = 2; i < turnsCount + 2; i++) {
+    for (var i = 2; i < turnsCounter + 2; i++) {
         
         notations.innerHTML = notations.innerHTML.replace(x, '<span style="font-weight: 700;">' + x + '</span>');
         x = i + ".";
@@ -1588,7 +1456,7 @@ connection.on("ReceiveReconnect", function (settings) {
 
     if (user.isInTurn == true) {  
         for (var i = 0; i < 8; i++) {
-            if (board[i].figure != null && board[i].figure.value[0] == 'P' && board[i].figure.side == user.side) {
+            if (board[i].piece != null && board[i].piece.value[0] == 'p' && board[i].piece.side == user.side) {
                 var retrievedExchangeInfo = JSON.parse(localStorage.getItem("exchangeInfo"));
 
                 var turnInfo = {
@@ -1598,23 +1466,23 @@ connection.on("ReceiveReconnect", function (settings) {
                     "turnCount": +settings.lastTurnInfo.turnsCount,
                     "isAttacked": 0,
                     "isPotentiallyAttacked": false,
-                    "figureToExchange": null,
+                    "pieceToExchange": null,
                     "attackedZones": [],
                     "defenceZones": []
                 }
                 for (var i = 0; i < 4; i++) {
-                    var figure = document.getElementById('figToExchange' + i);
-                    figure.turnInfo = turnInfo;
+                    var piece = document.getElementById('pieceToExchange' + i);
+                    piece.turnInfo = turnInfo;
                 }
                 showExchangeWindow();
                 break;
             }
         }
 
-        document.getElementById("turnInfo").innerHTML = "Ваш хід!";
+        document.getElementById("turnInfo").innerHTML = "Your turn!";
 
-        if (board[77 - settings.lastTurnInfo.pointA].figure != null) {
-            receiveFigureMove(settings.lastTurnInfo);
+        if (board[77 - settings.lastTurnInfo.pointA].piece != null) {
+            receivePieceMove(settings.lastTurnInfo);
         }
         if (settings.lastTurnInfo.isAttacked == true && notations.innerHTML[notations.innerHTML.length - 1] != '+') {
             notations.innerHTML += "+";
@@ -1624,18 +1492,17 @@ connection.on("ReceiveReconnect", function (settings) {
     else {
         document.getElementById("centralBoard").style.pointerEvents = 'none';
         timer.pause();       
-        document.getElementById("turnInfo").innerHTML = "Хід противника!";
+        document.getElementById("turnInfo").innerHTML = "Enemy turn!";
     }
 
     for (var key in settings.rooms) {
         
         var div = CreateRoom(key, settings.rooms[key]);
         document.getElementById("roomList").appendChild(div);       
-    }
-
-    //showInfoMessage("Ви перепідключились!");   
+    }  
 });
-//start game session
+
+//START GAME SESSION
 connection.on("ReceiveStartGameSession", function (message, isTurn) {  
     user.isInTurn = isTurn;
              
@@ -1655,11 +1522,9 @@ connection.on("ReceiveStartGameSession", function (message, isTurn) {
     if (!isTurn) {
         timer.pause();
     }  
-    
-    //showInfoMessage(message);
 });
 
-//close game session
+//CLOSE GAME SESSION
 connection.on("ReceiveCloseGameSession", function (message, cause) {
     var boardDiv = document.getElementById("centralBoard");
     timer.pause();
@@ -1669,16 +1534,15 @@ connection.on("ReceiveCloseGameSession", function (message, cause) {
     document.getElementById('turnInfo').innerHTML = message;
     boardDiv.style.pointerEvents = 'none';
     
-    //border: solid 2px black;
-
     showRefreshGameButton();
 
     user.joinedRoom = null;
     user.side = null;
     user.roomStatus = null;
     isKingAttacked = 0;
+    kingUnderAttack = null;
     isKingPotentiallyAttacked = false;
-    turnsCount = 0;
+    turnsCounter = 0;
 
 
     if (document.getElementById("deleteRoomButton").classList.contains("show")) {
@@ -1700,37 +1564,24 @@ connection.on("ReceiveCloseGameSession", function (message, cause) {
     }
     document.getElementById('gameTimer').style.backgroundColor = bgColor;
     hideTurnZones();
-
-    //showInfoMessage(message);
 });
 
-connection.on("ReceiveSpecialTurn", function (i) {
-    switch (i) {
-        case 1:
-            notations.innerHTML += '#';
-            break;
-        case 3:
-            notations.innerHTML += '+';
-            break;
-    }
-});
-//make turn
+//TIMER
 function getCountdown() {
     hours = check(parseInt(secondsLeft / 3600));
     minutes = check(parseInt(secondsLeft % 3600 / 60));
     seconds = check(parseInt(secondsLeft % 3600 % 60));
 
-    // строка обратного отсчета  + значение тега
     countdown.innerHTML = hours + ":" + minutes + ":" + seconds;
     secondsLeft--;
-}
-function check(i) {
-    return (i < 10 ? '0' : '') + i;
+    function check(i) {
+        return (i < 10 ? '0' : '') + i;
+    }
 }
 
+//RECEIVE TURN
 connection.on("ReceiveTurn", function (message, isTurn) {
     user.isInTurn = isTurn;
-    //showInfoMessage(message);
 
     document.getElementById('turnInfo').innerHTML = message;
     
@@ -1742,54 +1593,67 @@ connection.on("ReceiveTurn", function (message, isTurn) {
         document.getElementById("centralBoard").style.pointerEvents = 'none';
     }    
 });
-//timer
-
-//receive figure move
-connection.on("ReceiveFigureMove", function (turnInfo) {
-    receiveFigureMove(turnInfo)
+connection.on("ReceiveSpecialTurn", function (i) {
+    switch (i) {
+        case 1:
+            notations.innerHTML += '#';
+            break;
+        case 3:
+            notations.innerHTML += '+';
+            break;
+    }
 });
-function receiveFigureMove(turnInfo) {
-    turnsCount = turnInfo.turnsCount;
+
+
+//RECEIVE PIECE MOVE
+connection.on("ReceivePieceMove", function (turnInfo) {
+    receivePieceMove(turnInfo)
+});
+function receivePieceMove(turnInfo)
+{
+    turnsCounter = turnInfo.turnsCount;
     isKingAttacked = turnInfo.isAttacked;
+    kingUnderAttack = turnInfo.underAttack;
     isKingPotentiallyAttacked = turnInfo.isPotentiallyAttacked;
 
     var fromId = 77 - turnInfo.pointA;
     var toId = 77 - turnInfo.pointB;
 
-    if (board[fromId].figure.hasOwnProperty('enPassant') && board[fromId].figure.enPassant == 0) {
-        board[fromId].figure.enPassant = turnsCount;
+    if (board[fromId].piece.hasOwnProperty('enPassant') && board[fromId].piece.enPassant == 0) {
+        board[fromId].piece.enPassant = turnsCounter;
     }
 
     turnZones[0] = fromId;
 
-    moveFigure(toId, turnInfo.turnType);
+    movePiece(toId, turnInfo.turnType);
 
     turnZones = [];
 
-    if (turnInfo.figureToExchange != null) {
+    if (turnInfo.pieceToExchange != null) {
         turnInfo.pointA = fromId;
         turnInfo.pointB = toId;
-        exchangeFigure(turnInfo);
+        exchangePiece(turnInfo);
     }
 
     for (var i = 0; i < 78; i++) {
         if (board[i] != null) {
-            board[i].isAttacked = false;
+            board[i].isAttacked = false;         
             board[i].isForDefend = false;
+            board[i].underAttack = null;
         }
     }
-
-    turnInfo.attackedZones.forEach(function (item, i) {
+     
+    turnInfo.attackedZones.forEach(function (item) {
         board[77 - item].isAttacked = true;
     });
-    turnInfo.defenceZones.forEach(function (item, i) {
-        board[77 - item].isForDefend = true;
+    
+    turnInfo.defenceZones.forEach(function (item) {
+        board[77 - item.id].isForDefend = true;
+        board[77 - item.id].underAttack = item.underAttack;      
     });
-    //attackedZones.forEach(element => board[77 - element].isAttacked = true);
-    //defenceZones.forEach(element => board[77 - element].isForDefend = true);
 }
 
-//other functions
+//OTHER FUNCTIONS
 function hideShowRoomSettings() {
     document.getElementById("settingsContainer").classList.toggle("show");
     document.getElementById("roomManipulate").classList.toggle("changeBorder");
@@ -1817,11 +1681,6 @@ function showRefreshGameButton() {
     }       
     document.getElementById("giveUpButton").classList.toggle("show");
     document.getElementById("refreshGameButton").classList.toggle("show");
-}
-function showInfoMessage(message) {
-    var li = document.createElement("li");
-    li.textContent = message;
-    document.getElementById("messagesList").appendChild(li);
 }
 function getTimeControlSettings() {
     var e = document.getElementById("timeControl");

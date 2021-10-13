@@ -5998,24 +5998,28 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\vladc\\.nuget\\packages\\": {},
-    "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder": {}
+    "C:\\Users\\Ghost\\.nuget\\packages\\": {},
+    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {},
+    "C:\\Program Files (x86)\\Microsoft\\Xamarin\\NuGet\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\vladc\\Desktop\\JoJoChess\\JoJoChess\\JoJoChess.csproj",
+      "projectUniqueName": "C:\\Users\\Ghost\\Desktop\\bababoi\\clearVersion\\JoJoChess\\JoJoChess.csproj",
       "projectName": "JoJoChess",
-      "projectPath": "C:\\Users\\vladc\\Desktop\\JoJoChess\\JoJoChess\\JoJoChess.csproj",
-      "packagesPath": "C:\\Users\\vladc\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\vladc\\Desktop\\JoJoChess\\JoJoChess\\obj\\",
+      "projectPath": "C:\\Users\\Ghost\\Desktop\\bababoi\\clearVersion\\JoJoChess\\JoJoChess.csproj",
+      "packagesPath": "C:\\Users\\Ghost\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\Ghost\\Desktop\\bababoi\\clearVersion\\JoJoChess\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
-        "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder"
+        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages",
+        "C:\\Program Files (x86)\\Microsoft\\Xamarin\\NuGet\\"
       ],
       "configFilePaths": [
-        "C:\\Users\\vladc\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
+        "C:\\Users\\Ghost\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Xamarin.Offline.config"
       ],
       "originalTargetFrameworks": [
         "netcoreapp3.1"
@@ -6026,6 +6030,7 @@
       },
       "frameworks": {
         "netcoreapp3.1": {
+          "targetAlias": "netcoreapp3.1",
           "projectReferences": {}
         }
       },
@@ -6037,6 +6042,7 @@
     },
     "frameworks": {
       "netcoreapp3.1": {
+        "targetAlias": "netcoreapp3.1",
         "dependencies": {
           "Microsoft.VisualStudio.Web.CodeGeneration.Design": {
             "target": "Package",
@@ -6061,7 +6067,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\3.1.101\\RuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\5.0.301\\RuntimeIdentifierGraph.json"
       }
     }
   }

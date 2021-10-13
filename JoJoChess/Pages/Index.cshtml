@@ -6,13 +6,13 @@
                 <p class="arrow" id="arrow">&#x2BC7;</p>
             </div>
             <div class="exchangeVariants show" id="exchangeVariants">
-                <div class="figureImg">
+                <div class="pieceImg">
                 </div>
-                <div class="figureImg">
+                <div class="pieceImg">
                 </div>
-                <div class="figureImg">
+                <div class="pieceImg">
                 </div>
-                <div class="figureImg">
+                <div class="pieceImg">
                 </div>
             </div>
         </div>
@@ -183,20 +183,21 @@
             <p>H</p>
         </div>
     </div>
-    
+
     <div class="roomsContainer" id="roomsContainer">
-        
+
         <div class="roomManipulate" id="roomManipulate">
-            <input class="createButton show" id="createRoomButton" type="button" value="Створити кімнату" />
-            <input class="deleteButton" id="deleteRoomButton" type="button" value="Видалити кімнату" />
-            <input class="settingsButton show" id="setRoomSettings" type="button" value="Налаштування &#9881;" />
+            <input class="createButton show" id="createRoomButton" type="button" value="Create room" />
+            <input class="deleteButton" id="deleteRoomButton" type="button" value="Delete room" />
+            <input class="settingsButton show" id="setRoomSettings" type="button" value="Settings &#9881;" />
+            
             <div class="chessStyles show" id="chessStyles">
                 <div class="stylesButton" id="stylesButton">
                     <img src="~/content/images/others/palette.png" alt="Styles" />
                 </div>
                 <div class="stylesSelectors" id="stylesSelectors">
                     <div class="pickStyleDiv">
-                        <p>Кольорова палітра:</p>
+                        <p>Color palette:</p>
                         <select id="colorPalette">
                             <option value="0">Classic</option>
                             <option value="1">Gray</option>
@@ -207,7 +208,7 @@
                         </select>
                     </div>
                     <div class="pickStyleDiv">
-                        <p>Стиль дошки:</p>
+                        <p>Board style:</p>
                         <select id="boardStyles">
                             <option value="0">Classic</option>
                             <option value="1">Stone</option>
@@ -218,34 +219,34 @@
                         </select>
                     </div>
                     <div class="pickStyleDiv">
-                        <p>Стиль фігур:</p>
-                        <select id="figureStyles">
+                        <p>Pieces style:</p>
+                        <select id="piecesStyles">
                             <option value="0">Hamon</option>
                             <option value="1">Fake3d</option>
                             <option value="2">Leipzig</option>
                             <option value="3">Alpha</option>
                         </select>
                     </div>
-                    <input class="acceptStylesButton" id="acceptStylesButton" type="button" value="Застосувати" />
+                    <input class="acceptStylesButton" id="acceptStylesButton" type="button" value="Confirm" />
                 </div>
             </div>
         </div>
 
         <div class="settingsContainer" id="settingsContainer">
-            <p>Контроль часу: </p>
+            <p>Time control: </p>
             <select id="timeControl">
-                <option value="0">Бліц</option>
-                <option value="1">Рапід</option>
+                <option value="0">Blitz</option>
+                <option value="1">Rapid</option>
             </select>
-            <div class="question" id="questionButton" onclick="alert('Кожний гравець отримує:\n'+
-                                                                         'Бліц - 5 хвилин на гру; \nРапід - 15 хвилин на гру.')">&#63;</div>
+            <div class="question" id="questionButton" onclick="alert('Each player gets:\n'+
+                                                                         'Blitz - 5 minutes for game; \nRapid - 15 minutes for game.')">&#63;</div>
 
         </div>
 
-        <h5>Доступні кімнати:</h5>
+        <h5>Available rooms:</h5>
         <div id="availableRooms" class="availableRooms">
             <ul class="roomUl" id="roomList" />
-        </div>
+        </div>      
     </div>
     <div class="gameInfo" id="gameInfo">
         <div class="gameTimer" id="gameTimer">
@@ -256,11 +257,12 @@
             <p id="notations"></p>
         </div>
         <div class="gameActions" id="gameActions">
-            <input type="button" class="giveUpButton show" id="giveUpButton" value="Здатися" />
-            <input type="button" class="drawButton show" id="drawButton" value="Запропонувати нічию" />
-            <input type="button" class="refreshGameButton" id="refreshGameButton" value="Грати ще &#8635;" />
-        </div>
+            <input type="button" class="giveUpButton show" id="giveUpButton" value="Gave up" />
+            <input type="button" class="drawButton show" id="drawButton" value="Offer a draw" />
+            <input type="button" class="refreshGameButton" id="refreshGameButton" value="Play again &#8635;" />
+        </div>       
     </div>
 </div>
+
 <script src="~/js/signalr/dist/browser/signalr.js"></script>
 <script src="~/js/chess.js"></script>
